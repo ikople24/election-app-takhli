@@ -1,126 +1,154 @@
 "use client";
+import { useEffect, useState } from "react";
 
-import React, { useState, useEffect } from 'react';
-import { CldUploadWidget } from 'next-cloudinary';
-
-interface UploadResult {
-  info: {
-    secure_url: string;
-  };
+interface Candidate {
+  _id: string;
+  type: string;
+  index?: number;
+  districtIdx?: number;
+  candidateIdx?: number;
+  name: string;
+  image?: string;
 }
 
-export default function UploadCandidates() {
-  const [mayorImages, setMayorImages] = useState(Array(3).fill(''));
-  const [councilImages, setCouncilImages] = useState(
-    Array(3).fill(0).map(() => Array(7).fill(''))
-  );
+export default function UploadPage() {
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editingCandidate, setEditingCandidate] = useState<Candidate | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newImage, setNewImage] = useState("");
 
-  // Load images from results.json on mount
   useEffect(() => {
-    fetch('/data/results.json')
-      .then(res => res.json())
-      .then(data => {
-        setMayorImages(data.mayor.map((m: any) => m.image || ''));
-        setCouncilImages(data.council.map((d: any) => d.candidates.map((c: any) => c.image || '')));
-      });
+    const fetchCandidates = async () => {
+      try {
+        const res = await fetch("/api/candidates");
+        const data = await res.json();
+        setCandidates(data);
+      } catch (err) {
+        console.error("Error fetching candidates:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCandidates();
   }, []);
 
-  const handleMayorUpload = (index: number, result: UploadResult) => {
-    const url = result.info.secure_url;
-    const updated = [...mayorImages];
-    updated[index] = url;
-    setMayorImages(updated);
-
-    fetch('/api/save-image', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'mayor', index, url }),
-    })
-      .then(res => res.json())
-      .then(data => console.log('save-image response (mayor):', data))
-      .catch(err => console.error('save-image error (mayor):', err));
+  const openEditModal = (candidate: Candidate) => {
+    setEditingCandidate(candidate);
+    setNewName(candidate.name);
+    setNewImage(candidate.image || "");
+    setShowModal(true);
   };
 
-  const handleCouncilUpload = (districtIdx: number, candidateIdx: number, result: UploadResult) => {
-    const url = result.info.secure_url;
-    const updated = councilImages.map(d => [...d]);
-    updated[districtIdx][candidateIdx] = url;
-    setCouncilImages(updated);
+  if (loading) return <p>Loading...</p>;
 
-    fetch('/api/save-image', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'council', districtIdx, candidateIdx, url }),
-    })
-      .then(res => res.json())
-      .then(data => console.log('save-image response (council):', data))
-      .catch(err => console.error('save-image error (council):', err));
-  };
+  const mayorCandidates = candidates
+    .filter((c) => c.type === "mayor")
+    .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+
+  const councilCandidates = (districtIdx: number) =>
+    candidates
+      .filter((c) => c.type === "council" && c.districtIdx === districtIdx)
+      .sort((a, b) => (a.candidateIdx ?? 0) - (b.candidateIdx ?? 0));
 
   return (
-    <div className="p-4 max-w-6xl mx-auto">
-      <h1 className="text-3xl font-bold text-center mb-8">อัปโหลดภาพผู้สมัคร</h1>
-
-      <h2 className="text-2xl font-semibold mb-4">นายก</h2>
-      <div className="grid grid-cols-3 gap-6 mb-12">
-        {mayorImages.map((url, idx) => (
-          <div key={idx} className="border rounded shadow p-4 flex flex-col items-center">
-            <p className="mb-2 font-medium">ผู้สมัครนายก {idx + 1}</p>
-            <CldUploadWidget
-              uploadPreset={process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET}
-              onUpload={(result) => handleMayorUpload(idx, result as UploadResult)}
-            >
-              {({ open }) => (
-                <button onClick={() => open()} className="bg-blue-500 text-white px-4 py-2 rounded mb-4">
-                  อัปโหลดรูป
-                </button>
-              )}
-            </CldUploadWidget>
-            {url ? (
-              <img src={url} alt={`นายก ${idx + 1}`} className="h-40 object-contain rounded" />
-            ) : (
-              <div className="h-40 w-full bg-gray-100 flex items-center justify-center rounded text-gray-400">
-                ไม่มีรูป
-              </div>
-            )}
-          </div>
-        ))}
+    <div className="p-4 space-y-8">
+      <div>
+        <h1 className="text-2xl font-bold mb-4">ผู้สมัครนายก</h1>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {mayorCandidates.map((candidate) => (
+            <div key={candidate._id} className="border rounded-lg shadow p-4 flex flex-col items-center">
+              <img
+                src={candidate.image || "/placeholder.png"}
+                alt={candidate.name}
+                className="w-32 h-32 object-cover rounded-full mb-2"
+              />
+              <h2 className="font-semibold text-lg text-center">{candidate.name}</h2>
+              <p className="text-sm text-gray-500">เบอร์ {candidate.index! + 1}</p>
+              <button
+                onClick={() => openEditModal(candidate)}
+                className="mt-2 px-3 py-1 bg-yellow-500 text-black rounded hover:bg-yellow-600">แก้ไข</button>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {[0, 1, 2].map((districtIdx) => (
-        <div key={districtIdx} className="mb-12">
-          <h2 className="text-2xl font-semibold mb-4">สท. เขต {districtIdx + 1}</h2>
-          <div className="grid grid-cols-7 gap-4">
-            {councilImages[districtIdx].map((url, candidateIdx) => (
-              <div key={candidateIdx} className="border rounded shadow p-3 flex flex-col items-center">
-                <p className="mb-2 font-medium">ผู้สมัคร สท {candidateIdx + 1}</p>
-                <CldUploadWidget
-                  uploadPreset={process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET}
-                  onUpload={(result) => handleCouncilUpload(districtIdx, candidateIdx, result as UploadResult)}
-                >
-                  {({ open }) => (
-                    <button onClick={() => open()} className="bg-green-500 text-white px-3 py-1 rounded mb-3 text-sm">
-                      อัปโหลดรูป
-                    </button>
-                  )}
-                </CldUploadWidget>
-                {url ? (
-                  <img src={url} alt={`สท เขต${districtIdx + 1}-${candidateIdx + 1}`} className="h-28 object-contain rounded" />
-                ) : (
-                  <div className="h-28 w-full bg-gray-100 flex items-center justify-center rounded text-gray-400 text-xs">
-                    ไม่มีรูป
-                  </div>
-                )}
+      {[0, 1, 2].map((district) => (
+        <div key={district}>
+          <h1 className="text-2xl font-bold mb-4">ผู้สมัคร สท เขต {district + 1}</h1>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {councilCandidates(district).map((candidate) => (
+              <div key={candidate._id} className="border rounded-lg shadow p-4 flex flex-col items-center">
+                <img
+                  src={candidate.image || "/placeholder.png"}
+                  alt={candidate.name}
+                  className="w-32 h-32 object-cover rounded-full mb-2"
+                />
+                <h2 className="font-semibold text-lg text-center">{candidate.name}</h2>
+                <p className="text-sm text-gray-500">เขต {candidate.districtIdx! + 1} เบอร์ {candidate.candidateIdx! + 1}</p>
+                <button
+                  onClick={() => openEditModal(candidate)}
+                  className="mt-2 px-3 py-1 bg-yellow-500 text-black rounded hover:bg-yellow-600">แก้ไข</button>
               </div>
             ))}
           </div>
         </div>
       ))}
 
-      {/* 💡 ตรวจสอบว่า .env.local มีค่า:
-        NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=your_preset_name
-        NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=your_cloud_name
-      */}
+      {showModal && editingCandidate && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded shadow-lg w-80 relative text-black">
+            <h2 className="text-lg font-bold mb-4 text-center text-black">แก้ไขข้อมูลผู้สมัคร</h2>
+            <label className="block text-sm mb-1 text-black">ชื่อผู้สมัคร</label>
+            <input
+              type="text"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              className="w-full border rounded px-2 py-1 mb-3"
+            />
+            <label className="block text-sm mb-1 text-black">อัพโหลดรูปภาพ</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  const reader = new FileReader();
+                  reader.onloadend = () => {
+                    setNewImage(reader.result as string);
+                  };
+                  reader.readAsDataURL(file);
+                }
+              }}
+              className="w-full mb-3"
+            />
+            {newImage && <img src={newImage} alt="preview" className="w-24 h-24 object-cover rounded-full mx-auto mb-3" />}
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-3 py-1 bg-gray-300 rounded">ยกเลิก</button>
+              <button
+                onClick={async () => {
+                  const res = await fetch(`/api/candidates/${editingCandidate._id}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name: newName, image: newImage }),
+                  });
+                  if (res.ok) {
+                    const updated = candidates.map((c) => c._id === editingCandidate._id ? { ...c, name: newName, image: newImage } : c);
+                    setCandidates(updated);
+                    setShowModal(false);
+                  } else {
+                    alert("เกิดข้อผิดพลาดในการบันทึก");
+                  }
+                }}
+                className="px-3 py-1 bg-blue-500 text-white rounded">บันทึก</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

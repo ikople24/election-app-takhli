@@ -1,30 +1,42 @@
-
-
-import { promises as fs } from 'fs';
-import path from 'path';
-import { NextResponse } from 'next/server';
+import { MongoClient } from "mongodb";
 
 export async function POST(req: Request) {
-  const body = await req.json();
-  const filePath = path.join(process.cwd(), 'app/data/results.json');
-
+  const client = new MongoClient(process.env.MONGO_URI!);
+  
   try {
-    const jsonData = JSON.parse(await fs.readFile(filePath, 'utf-8'));
+    await client.connect(); // ensure connection
+    const { type, index, districtIdx, candidateIdx, url } = await req.json();
+    const db = client.db("election");
+    const collection = db.collection("candidates");
 
-    if (body.type === 'mayor') {
-      jsonData.mayor[body.index].image = body.url;
-    } else if (body.type === 'council') {
-      jsonData.council[body.districtIdx].candidates[body.candidateIdx].image = body.url;
+    let filter: any = { type };
+    if (type === "mayor" && index !== undefined) {
+      filter.index = Number(index);
+    } else if (type === "council" && districtIdx !== undefined && candidateIdx !== undefined) {
+      filter.districtIdx = Number(districtIdx);
+      filter.candidateIdx = Number(candidateIdx);
     } else {
-      return NextResponse.json({ error: 'Invalid type' }, { status: 400 });
+      return new Response(JSON.stringify({ success: false, message: "Invalid parameters" }), { status: 400 });
     }
 
-    await fs.writeFile(filePath, JSON.stringify(jsonData, null, 2));
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    if (error instanceof Error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    console.log("Filter query:", filter);
+
+    const result = await collection.updateOne(
+      filter,
+      { $set: { image: url } },
+      { upsert: false }
+    );
+
+    console.log("Update result:", result);
+
+    if (result.matchedCount === 0) {
+      return new Response(JSON.stringify({ success: false, message: "No matching document found" }), { status: 404 });
     }
-    return NextResponse.json({ error: 'Unknown error' }, { status: 500 });
+    return new Response(JSON.stringify({ success: true, modifiedCount: result.modifiedCount }));
+  } catch (error) {
+    console.error("Error in save-image API:", error);
+    return new Response(JSON.stringify({ success: false, message: "Internal server error" }), { status: 500 });
+  } finally {
+    await client.close();
   }
 }

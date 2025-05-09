@@ -249,6 +249,12 @@ export default function Admin() {
         >
           รีเซตข้อมูล
         </button>
+        <button
+          onClick={() => window.location.href = "/admin/uploads"}
+          className="ml-2 bg-blue-500 text-white px-4 py-1 rounded hover:bg-blue-600 shadow"
+        >
+          อัปโหลดรูปภาพ
+        </button>
       </nav>
       <h1 className="text-3xl font-bold text-center mb-8">Admin: กรอกคะแนน</h1>
 
