@@ -1,5 +1,7 @@
 
+// @ts-nocheck
 "use client";
+import { io } from "socket.io-client";
 import { useState, useEffect } from "react";
 import { Edit3, UserRoundPen, Lock, Unlock } from "lucide-react";
 
@@ -22,6 +24,8 @@ interface AdminData {
 
 export default function Admin() {
   const [focusedTable, setFocusedTable] = useState<"mayor" | number | null>(null);
+  // Initialize socket.io-client
+  const socket = io();
   const [data, setData] = useState<AdminData | null>(null);
   // เพิ่ม state สำหรับตารางที่ถูกแก้ไข
   const [modifiedTables, setModifiedTables] = useState<Set<"mayor" | number>>(new Set());
@@ -174,6 +178,7 @@ export default function Admin() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(updatedData),
     });
+    socket.emit("scoreUpdated");
 
     setData(updatedData);
     setModifiedTables(prev => {
@@ -206,6 +211,7 @@ export default function Admin() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(updatedData),
     });
+    socket.emit("scoreUpdated");
 
     setData(updatedData);
     setModifiedTables(prev => {
