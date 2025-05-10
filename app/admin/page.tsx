@@ -1,9 +1,10 @@
 
 // @ts-nocheck
 "use client";
-import { io } from "socket.io-client";
+
 import { useState, useEffect } from "react";
 import { Edit3, UserRoundPen, Lock, Unlock } from "lucide-react";
+import Swal from 'sweetalert2';
 
 
 interface Candidate {
@@ -23,9 +24,9 @@ interface AdminData {
 }
 
 export default function Admin() {
+  // broadcast channel to notify root page when data is saved
+  const channel = new BroadcastChannel("election");
   const [focusedTable, setFocusedTable] = useState<"mayor" | number | null>(null);
-  // Initialize socket.io-client
-  const socket = io();
   const [data, setData] = useState<AdminData | null>(null);
   // เพิ่ม state สำหรับตารางที่ถูกแก้ไข
   const [modifiedTables, setModifiedTables] = useState<Set<"mayor" | number>>(new Set());
@@ -93,9 +94,9 @@ export default function Admin() {
   const [editingCandidate, setEditingCandidate] = useState<{ type: "mayor" | "council"; districtIdx?: number; candidateIdx: number } | null>(null);
   const [newCandidateName, setNewCandidateName] = useState("");
 
-  // ฟังก์ชันรีเซตข้อมูลกลับค่า default (move inside Admin to access setData)
+  // ฟังก์ชันรีเซตข้อมูลกลับค่า default (update: overwrite localStorage & notify root)
   const resetData = () => {
-    setData({
+    const defaultData = {
       mayor: Array(3).fill(0).map((_, i) => ({
         name: `ผู้สมัครนายก ${i + 1}`,
         votes: Array(24).fill(0),
@@ -128,8 +129,20 @@ export default function Admin() {
           })),
         },
       ],
+    };
+    localStorage.removeItem("electionData"); // ลบข้อมูลเก่า
+    localStorage.removeItem("electionUpdatedAt"); // ลบ timestamp เก่า
+    localStorage.setItem("electionData", JSON.stringify(defaultData)); // เขียนค่าใหม่
+    localStorage.setItem("electionUpdatedAt", Date.now().toString()); // timestamp ใหม่
+    setData(defaultData); // อัพเดต state
+    const channel = new BroadcastChannel("election");
+    channel.postMessage("reset");
+    Swal.fire({
+      icon: 'success',
+      title: 'รีเซตข้อมูลเรียบร้อย',
+      showConfirmButton: false,
+      timer: 1500
     });
-    alert("รีเซตข้อมูลเรียบร้อย");
   };
 
   const handleMayorVoteChange = (candidateIdx: number, unitIdx: number, val: string) => {
@@ -178,7 +191,6 @@ export default function Admin() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(updatedData),
     });
-    socket.emit("scoreUpdated");
 
     setData(updatedData);
     setModifiedTables(prev => {
@@ -191,7 +203,14 @@ export default function Admin() {
       newMap.delete("mayor");
       return newMap;
     });
-    alert("บันทึกผล นายก เรียบร้อย");
+    Swal.fire({
+      icon: 'success',
+      title: 'บันทึกผล นายก เรียบร้อย',
+      showConfirmButton: false,
+      timer: 1500
+    });
+    localStorage.setItem("electionUpdatedAt", Date.now().toString());
+    channel.postMessage("updated");
   };
 
   const handleSaveCouncil = async (districtIdx: number) => {
@@ -211,7 +230,6 @@ export default function Admin() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(updatedData),
     });
-    socket.emit("scoreUpdated");
 
     setData(updatedData);
     setModifiedTables(prev => {
@@ -224,7 +242,14 @@ export default function Admin() {
       newMap.delete(districtIdx);
       return newMap;
     });
-    alert(`บันทึกผล เขต ${districtIdx + 1} เรียบร้อย`);
+    Swal.fire({
+      icon: 'success',
+      title: `บันทึกผล เขต ${districtIdx + 1} เรียบร้อย`,
+      showConfirmButton: false,
+      timer: 1500
+    });
+    localStorage.setItem("electionUpdatedAt", Date.now().toString());
+    channel.postMessage("updated");
   };
 
   // Save data to localStorage on every change
