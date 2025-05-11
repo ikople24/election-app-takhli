@@ -26,6 +26,28 @@ interface AdminData {
 export default function Admin() {
   // broadcast channel to notify root page when data is saved
   const channel = new BroadcastChannel("election");
+  // Listen for reset event from BroadcastChannel and show toast
+  useEffect(() => {
+    const channel = new BroadcastChannel("election");
+    channel.onmessage = (event) => {
+      if (event.data === "reset") {
+        Swal.fire({
+          icon: 'info',
+          title: 'รีเซตข้อมูลจากหน้าหลักแล้ว',
+          showConfirmButton: false,
+          timer: 1500
+        });
+      }
+    };
+    return () => channel.close();
+  }, []);
+  // Set up BroadcastChannel cleanup
+  useEffect(() => {
+    const channel = new BroadcastChannel("election");
+    return () => {
+      channel.close();
+    };
+  }, []);
   const [focusedTable, setFocusedTable] = useState<"mayor" | number | null>(null);
   const [data, setData] = useState<AdminData | null>(null);
   // เพิ่ม state สำหรับตารางที่ถูกแก้ไข
@@ -90,6 +112,8 @@ export default function Admin() {
       }
     }
   }, []);
+  // Listen for reset event from BroadcastChannel and show toast (moved here)
+  // (already moved above)
 
   const [editingCandidate, setEditingCandidate] = useState<{ type: "mayor" | "council"; districtIdx?: number; candidateIdx: number } | null>(null);
   const [newCandidateName, setNewCandidateName] = useState("");
@@ -319,16 +343,17 @@ export default function Admin() {
           {lockedTimestamps.get("mayor") && `ปิดนับเวลา: ${lockedTimestamps.get("mayor")}`}
         </span>
       </h2>
-        <table className="w-full table-fixed bg-white text-black border border-gray-300 divide-y divide-gray-200 shadow-md rounded-lg text-sm leading-normal">
+        <div className="overflow-x-auto">
+        <table className="table-auto bg-white text-black border border-gray-300 divide-y divide-gray-200 shadow-md rounded-lg text-sm leading-normal">
           <thead className="bg-gray-100">
               <tr>
                 <th rowSpan={2} className="border border-gray-300 px-3 py-2 whitespace-normal text-center">
                   หมาย<br />เลข
                 </th>
                 <th rowSpan={2} className="border border-gray-300 px-3 py-2 min-w-60 whitespace-normal text-center">ชื่อ-นามสกุล</th>
-                <th colSpan={8} className="border border-gray-300 px-3 py-2 bg-yellow-200 text-black whitespace-nowrap text-center">เขตเลือกตั้งที่ 1</th>
-                <th colSpan={9} className="border border-gray-300 px-3 py-2 bg-pink-200 text-black whitespace-nowrap text-center">เขตเลือกตั้งที่ 2</th>
-                <th colSpan={7} className="border border-gray-300 px-3 py-2 bg-blue-200 text-black whitespace-nowrap text-center">เขตเลือกตั้งที่ 3</th>
+                <th colSpan={8} className="border border-gray-300 px-3 py-2 bg-blue-300 text-black whitespace-nowrap text-center">เขตเลือกตั้งที่ 1 (1-8)</th>
+                <th colSpan={9} className="border border-gray-300 px-3 py-2 bg-green-300 text-black whitespace-nowrap text-center">เขตเลือกตั้งที่ 2 (1-9)</th>
+                <th colSpan={7} className="border border-gray-300 px-3 py-2 bg-pink-300 text-black whitespace-nowrap text-center">เขตเลือกตั้งที่ 3 (1-7)</th>
                 <th rowSpan={2} className="border border-gray-300 px-3 py-2 whitespace-normal text-center align-middle">
                   คะแนน<br />รวม
                 </th>
@@ -342,7 +367,7 @@ export default function Admin() {
                       (modifiedUnits.get("mayor")?.has(unitIdx)) ? "bg-orange-300 animate-pulse" : ""
                     } group-hover:bg-purple-100`}
                   >
-                    หน่วย {unitIdx + 1}
+                    หน่วย {unitIdx < 8 ? unitIdx + 1 : unitIdx < 17 ? unitIdx - 7 : unitIdx - 16}
                   </th>
                 ))}
               </tr>
@@ -355,7 +380,14 @@ export default function Admin() {
                   {candidate.name}
                 </td>
                 {candidate.votes.map((score, unitIdx) => (
-                  <td key={unitIdx} className="border border-gray-300 px-1 py-1 group-hover:bg-purple-100">
+                  <td
+                    key={unitIdx}
+                    className={`border border-gray-300 px-1 py-1 group-hover:bg-purple-100 ${score > 0 ? 'bg-green-200' : ''} ${
+                      unitIdx === 0 ? 'border-l-4 border-blue-300' :
+                      unitIdx === 8 ? 'border-l-4 border-green-300' :
+                      unitIdx === 17 ? 'border-l-4 border-pink-300' : ''
+                    }`}
+                  >
                     <div className="flex items-center justify-center h-full">
                       <input
                         type="number"
@@ -380,7 +412,7 @@ export default function Admin() {
                         onChange={(e) =>
                           handleMayorVoteChange(candidateIdx, unitIdx, e.target.value)
                         }
-                        className="border border-gray-300 rounded px-2 py-2 w-full max-w-[4rem] text-center text-base focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        className="border border-gray-300 rounded px-2 py-2 w-[5.5rem] text-center text-base focus:outline-none focus:ring-2 focus:ring-blue-400"
                       />
                     </div>
                   </td>
@@ -391,6 +423,7 @@ export default function Admin() {
             ))}
           </tbody>
         </table>
+        </div>
         <div className="flex flex-row items-center">
           <button
             onClick={handleSaveMayor}
@@ -457,7 +490,11 @@ export default function Admin() {
             </span>
           </h2>
           <table className="w-full table-fixed bg-white text-black border border-gray-300 divide-y divide-gray-200 shadow-md rounded-lg text-sm leading-normal">
-            <thead className="bg-gray-100">
+            <thead className={`${
+              districtIdx === 0 ? "bg-blue-300" :
+              districtIdx === 1 ? "bg-green-300" :
+              "bg-pink-300"
+            }`}>
               <tr>
                 <th className="border border-gray-300 px-3 py-2 whitespace-normal text-center">
                   หมาย<br />เลข
@@ -487,7 +524,10 @@ export default function Admin() {
                     {candidate.name}
                   </td>
                   {candidate.votes.map((score, unitIdx) => (
-                    <td key={unitIdx} className="border border-gray-300 px-1 py-1 group-hover:bg-purple-100">
+                    <td
+                      key={unitIdx}
+                      className={`border border-gray-300 px-1 py-1 group-hover:bg-purple-100 ${score > 0 ? 'bg-green-200' : ''}`}
+                    >
                       <div className="flex items-center justify-center h-full">
                         <input
                           type="number"

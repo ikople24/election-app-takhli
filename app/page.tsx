@@ -79,8 +79,13 @@ export default function Home() {
         toast.success("มีผลคะแนนอัพเดทใหม่!");
       }
     };
+    // Add interval for fetching every 1 minute
+    const interval = setInterval(() => {
+      fetchAndToggleLoading();
+    }, 3000); // 1 minute
     return () => {
       bc.close();
+      clearInterval(interval);
     };
   }, [fetchData]);
 
@@ -150,8 +155,8 @@ export default function Home() {
           className: "transition-all duration-1000 ease-in-out"
         }}
       />
-      <h1 className="text-2xl font-bold text-center text-blue-600 mb-2">ผลการนับคะแนนเลือกตั้งอย่างไม่เป็นทางการ</h1>
-      <h2 className="text-xl font-medium text-center text-gray-700 mb-4">
+      <h1 className="text-4xl font-noto-thai font-extrabold text-center text-blue-600 mb-2">ผลการนับคะแนนเลือกตั้งสมาชิกสภาเทศบาลเมืองตาคลี และนายกเทศมนตรีเมืองตาคลี <span className="text-red-600">(อย่างไม่เป็นทางการ)</span></h1>
+      <h2 className="text-2xl font-noto-thai font-bold text-center text-gray-700 mb-4">
         เทศบาลเมืองตาคลี อ.ตาคลี จ.นครสวรรค์
       </h2>
       
@@ -180,13 +185,13 @@ export default function Home() {
       <div className="bg-white rounded-lg shadow p-4">
         {/* Mayor Section */}
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-semibold">คะแนนนายกเทศมนตรี (รวมทุกเขต)</h2>
+          <h2 className="text-3xl font-noto-thai font-extrabold">คะแนนนายกเทศมนตรี (รวมทุกเขต)</h2>
           {lastFetched && (
             <p className="text-lg text-gray-500 flex items-center space-x-1">
               <RotateCcw
                 className={`w-4 h-4 ${
                   loading ? "animate-spin" : ""
-                } transition duration-3000`}
+                } transition duration-[5000ms]`}
               />
               <span>
                 อัพเดทล่าสุด:{" "}
@@ -208,13 +213,13 @@ export default function Home() {
           {mayorList.map((candidate, i) => (
             <motion.div
               key={i}
-              className={`rounded-lg shadow-lg p-6 flex items-center transition-all ${
+              className={`relative overflow-hidden rounded-lg shadow-lg p-6 flex items-center transition-all ${
                 candidate.score === 0
                   ? "bg-gray-50 border border-gray-300 scale-100 opacity-100"
                   : candidate.score === highestMayor
                     ? allDistrictsReported100
-                      ? "ring-8 neon-glow-rainbow scale-110"
-                      : "ring-8 neon-glow-yellow scale-110"
+                      ? "ring-8 neon-glow-rainbow scale-[1.05]"
+                      : "ring-8 neon-glow-yellow scale-[1.05]"
                     : "bg-gray-50 border border-gray-300 scale-90 opacity-90"
               }`}
               initial={{ opacity: 0, y: 20 }}
@@ -286,23 +291,23 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
-                <p className="text-right text-xl font-medium mt-1 space-x-2">
-                  <span className="px-1 rounded bg-blue-200 text-blue-900">
+                <div className="flex flex-wrap gap-2 justify-end text-xl font-medium mt-1">
+                  <div className="px-1 rounded bg-blue-200 text-blue-900">
                     เขต 1: {candidate.votes.slice(0, 8).reduce((sum, v) => sum + v, 0).toLocaleString()}
-                  </span>
-                  <span className="px-1 rounded bg-green-200 text-green-900">
+                  </div>
+                  <div className="px-1 rounded bg-green-200 text-green-900">
                     เขต 2: {candidate.votes.slice(8, 17).reduce((sum, v) => sum + v, 0).toLocaleString()}
-                  </span>
-                  <span className="px-1 rounded bg-pink-200 text-pink-900">
+                  </div>
+                  <div className="px-1 rounded bg-pink-200 text-pink-900">
                     เขต 3: {candidate.votes.slice(17).reduce((sum, v) => sum + v, 0).toLocaleString()}
-                  </span>
+                  </div>
                   <span className="text-black"> คะแนน</span>
-                </p>
+                </div>
                 {candidate.score !== 0 && (
                   <p className="text-right text-2xl font-bold mt-1 flex justify-end items-center space-x-1">
                     {candidate.rank === 1 && <Award className="w-8 h-8 rainbow-text animate-pulse" />}
                     <span className={candidate.rank === 1 ? 'rainbow-text' : 'text-purple-600'}>
-                      อันดับ {candidate.rank}
+                      คะแนนอันดับ {candidate.rank}
                     </span>
                   </p>
                 )}
@@ -312,7 +317,7 @@ export default function Home() {
         </div>
 
         {/* Council Section */}
-        <h2 className="text-2xl font-semibold mb-2">คะแนนสมาชิกสภาเทศบาล (สท.)</h2>
+        <h2 className="text-3xl font-noto-thai font-extrabold mb-2">คะแนนสมาชิกสภาเทศบาล (สท.)</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {districtsList.map((district, districtIdx) => (
             <motion.div
@@ -403,8 +408,6 @@ export default function Home() {
                               >
                                 <BadgeCheck className="ml-2 w-5 h-5 text-green-500 animate-pulse" />
                               </motion.div>
-                            ) : candidate.rank === 7 ? (
-                              <Info className="ml-2 w-5 h-5" style={{ color: "#800000" }} />
                             ) : null}
                           </td>
                           <td
